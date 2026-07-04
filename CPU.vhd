@@ -198,6 +198,17 @@ begin
 
   -- PROCESSOS
 
+  muxALUI1: process(rd1, pcOUT, ctrlLUI, ctrlAUIPC)
+  begin
+    if ctrlLUI = '1' then
+      aluI1 <= (others => '0');
+    elsif ctrlAUIPC = '1' then
+      aluI1 <= pcOUT;
+    else
+      aluI1 <= rd1;
+    end if;
+  end process muxALUI1;
+
   addPC4: process(pcIN)
   begin
     pcp4IN <= std_logic_vector(unsigned(pcIN) + 4);
@@ -208,16 +219,25 @@ begin
     pcDISPL <= std_logic_vector(shift_left(unsigned(imm32OUT), 1) + unsigned(pcOUT));
   end process addPCImm;
 
-  lgmuxPC: process(ctrlBranch, aluZERO)
+  muxJALR: process(pcDISPL, aluOUT, ctrlJALr)
   begin
-    ctrlMpc <= ctrlBranch and aluZERO;
+    case ctrlJALr is
+      when '0'    => pcTARGET <= pcDISPL;
+      when '1'    => pcTARGET <= aluOUT;
+      when others => pcTARGET <= pcDISPL;
+    end case;
+  end process muxJALR;
+
+  lgmuxPC: process(ctrlBranch, aluZERO, ctrlJAL)
+  begin
+    ctrlMpc <= (ctrlBranch and aluZERO) or ctrlJAL;
   end process lgmuxPC;
 
-  muxPC: process(pcp4IN, pcDISPL, ctrlMpc)
+  muxPC: process(pcp4IN, pcTARGET, ctrlMpc)
   begin
     case ctrlMpc is
-      when '0' => pcIN <= pcp4IN;
-      when '1' => pcIN <= pcDISPL;
+      when '0'    => pcIN <= pcp4IN;
+      when '1'    => pcIN <= pcTARGET;
       when others => pcIN <= pcp4IN;
     end case;
   end process muxPC;
