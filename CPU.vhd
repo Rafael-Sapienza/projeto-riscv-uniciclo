@@ -11,6 +11,9 @@ entity uRV is
     ROMDP : integer := (2**ROMSIZE);
     RADRR : natural := 5
   );
+  port (
+    clk : in std_logic
+  );
 end uRV;
 
 
@@ -26,7 +29,7 @@ component REG is
     clk, clr, ld : in std_logic;
     q            : out std_logic_vector(WSIZE-1 downto 0)
   );
-end component;
+end component REG;
 
 -- Memória ROM (IM)
 component ROM is
@@ -34,7 +37,7 @@ component ROM is
     addr : in std_logic_vector(ROMSIZE-1 downto 0); -- 10:0
     outw : out std_logic_vector(WSIZE-1 downto 0)
   );
-end component;
+end component ROM;
 
 -- Memória RAM (DM)
 component RAM is
@@ -45,9 +48,9 @@ component RAM is
     sgn_en  : in std_logic;
     addr    : in std_logic_vector(RAMSIZE-1 downto 0); -- 12:0
     datain  : in std_logic_vector(WSIZE-1 downto 0);
-    dataout : out std_logic_vector(WSIZE-1 downto 0);
+    dataout : out std_logic_vector(WSIZE-1 downto 0)
   );
-end component;
+end component RAM;
 
 -- Banco de registradores
 component XREGS is
@@ -57,7 +60,7 @@ component XREGS is
     data         : in std_logic_vector(WSIZE-1 downto 0);
     ro1, ro2     : out std_logic_vector(WSIZE-1 downto 0)
   );
-end component;
+end component XREGS;
 
 -- Gerador de Imediatos
 component genImm32 is
@@ -65,7 +68,7 @@ component genImm32 is
     instr : in std_logic_vector(31 downto 0);
     imm32 : out signed(31 downto 0)
   );
-end component;
+end component genImm32;
 
 -- ULA
 component ulaRV is
@@ -75,7 +78,7 @@ component ulaRV is
     Z      : out std_logic_vector(WSIZE-1 downto 0);
     cond   : out std_logic
   );
-end component;
+end component ulaRV;
 
 -- Controle
 component ControlUnit is
@@ -93,7 +96,7 @@ component ControlUnit is
     ALUSrc      : out STD_LOGIC;
     ALUOp       : out STD_LOGIC_VECTOR(1 downto 0)
   );
-end component;
+end component ControlUnit;
 
 -- ULA Controle
 component ALUControl is
@@ -103,23 +106,22 @@ component ALUControl is
         funct7     : in  STD_LOGIC_VECTOR(6 downto 0);
         ALUControl : out STD_LOGIC_VECTOR(3 downto 0)
     );
-end component;
+end component ALUControl;
 
 
 
-type vWsize is std_logic_vector(WSIZE-1 downto 0);
+-- type vWsize is std_logic_vector(WSIZE-1 downto 0);
 
 
 -- SINAIS
 
-signal clk : std_logic;
-
-signal pcIN, pcOUT     : vWsize := (others => '0'); -- PC in/out
-signal pcDISPL         : vWsize := (others => '0'); -- PC displacement (pc+imm)
-signal pcp4IN, pcp4OUT : vWsize := (others => '0'); -- PC+4 in/out
+signal pcIN, pcOUT     : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- PC in/out
+signal pcDISPL         : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- PC displacement (pc+imm)
+signal pcTARGET        : std_logic_vector(WSIZE-1 downto 0) := (others => '0');
+signal pcp4IN, pcp4OUT : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- PC+4 in/out
 
 alias imIN is pcOUT(12 downto 2); -- Instruction Memory in
-signal imOUT : vWsize := (others => '0'); -- Instruction Memory out
+signal imOUT : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- Instruction Memory out
 
 -- Separando a instrução
 alias Iopcode : std_logic_vector(6 downto 0) is imOUT(6 downto 0);
@@ -129,10 +131,10 @@ alias Iwrd    : std_logic_vector(4 downto 0) is imOUT(11 downto 7);
 alias Ifunct3 : std_logic_vector(2 downto 0) is imOUT(14 downto 12);
 alias Ifunct7 : std_logic_vector(6 downto 0) is imOUT(31 downto 25);
 
-signal wregdataIN : vWsize := (others => '0'); -- Write Data XREG
-signal rd1, rd2   : vWsize := (others => '0'); -- Read registers XREG
+signal wregdataIN : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- Write Data XREG
+signal rd1, rd2   : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- Read registers XREG
 
-signal imm32OUT : vWsize := (others => '0'); -- Immediate OUT
+signal imm32OUT : signed(WSIZE-1 downto 0) := (others => '0'); -- Immediate OUT
 
 -- Sinais de controle
 signal ctrlBranch  : std_logic := '0';
@@ -144,20 +146,20 @@ signal ctrlMemRead : std_logic := '0';
 signal ctrlMemWr   : std_logic := '0';
 signal ctrlMem2Reg : std_logic := '0';
 signal ctrlRegWr   : std_logic := '0';
-signal ctrlALUOp   : std_logic := '0';
+signal ctrlALUOp   : std_logic_vector(1 downto 0) := (others => '0');
 signal ctrlALUSr   : std_logic := '0';
 signal ctrlMpc     : std_logic := '0'; -- PC Mux control
 
 -- ULA
 signal aluZERO   : std_logic;
-signal aluI1     : vWsize;
-signal aluI2     : vWsize;
-signal aluOUT    : vWsize;
+signal aluI1     : std_logic_vector(WSIZE-1 downto 0);
+signal aluI2     : std_logic_vector(WSIZE-1 downto 0);
+signal aluOUT    : std_logic_vector(WSIZE-1 downto 0);
 signal ctrlALUmt : std_logic_vector(3 downto 0);
 
 -- Data Memory
 alias dmAddr : std_logic_vector(RAMSIZE-1 downto 0) is aluOUT(RAMSIZE-1 downto 0);
-sinal dmOUT  : vWsize;
+signal dmOUT : std_logic_vector(WSIZE-1 downto 0);
 
 -- Constantes globais
 signal cnstZERO : std_logic := '0';
@@ -170,8 +172,8 @@ begin
   -- COMPONENTES
 
   -- Registrador PC e PC+4
-  regPC: REG port map(pcIN, clck, cnstZERO, cnstONE, pcOUT);
-  regPCp4: REG port map(pcp4IN, clck, cnstZERO, cnstONE, pcp4OUT);
+  regPC: REG port map(pcIN, clk, cnstZERO, cnstONE, pcOUT);
+  regPCp4: REG port map(pcp4IN, clk, cnstZERO, cnstONE, pcp4OUT);
 
   -- Memória ROM de instruções
   romIM: ROM port map(imIN, imOUT);
@@ -180,7 +182,7 @@ begin
   GI: genImm32 port map(imOUT, imm32OUT);
 
   -- Banco de registradores
-  regBANK: XREG port map(clk, ctrlRegWr, Irr1, Irr2, Iwrd, wregdataIN, rd1, rd2);
+  regBANK: XREGS port map(clk, ctrlRegWr, Irr1, Irr2, Iwrd, wregdataIN, rd1, rd2);
 
   -- ULA
   aluULA: ulaRV port map(ctrlALUmt, aluI1, aluI2, aluOUT, aluZERO);
@@ -216,7 +218,7 @@ begin
 
   addPCImm: process(imm32OUT, pcOUT)
   begin
-    pcDISPL <= std_logic_vector(shift_left(unsigned(imm32OUT), 1) + unsigned(pcOUT));
+    pcDISPL <= std_logic_vector(shift_left(imm32OUT, 1) + signed(pcOUT));
   end process addPCImm;
 
   muxJALR: process(pcDISPL, aluOUT, ctrlJALr)
@@ -246,7 +248,7 @@ begin
   begin
     case ctrlALUSr is
       when '0' => aluI2 <= rd2;
-      when '1' => aluI2 <= imm32OUT;
+      when '1' => aluI2 <= std_logic_vector(imm32OUT);
       when others => aluI2 <= rd2;
     end case;
   end process muxRD2;
