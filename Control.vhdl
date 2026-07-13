@@ -9,6 +9,7 @@ entity ControlUnit is
         IsJalr      : out STD_LOGIC;
         IsLUI       : out STD_LOGIC;
         IsAuipc     : out STD_LOGIC;
+        Ecall       : out STD_LOGIC;
         MemRead     : out STD_LOGIC;
         MemWrite    : out STD_LOGIC;
         MemToReg    : out STD_LOGIC;
@@ -32,6 +33,7 @@ architecture Behavioral of ControlUnit is
     constant JALR_OP      : std_logic_vector(6 downto 0) := "1100111"; -- JALR
     constant LUI_OP       : std_logic_vector(6 downto 0) := "0110111"; -- LUI
     constant AUIPC_OP     : std_logic_vector(6 downto 0) := "0010111"; -- AUIPC
+    constant ECALL_OP     : std_logic_vector(6 downto 0) := "1110011"; -- ECALL (SYSTEM)
 
 begin
 
@@ -43,6 +45,7 @@ begin
     IsJalr      <= '0';
     IsLUI       <= '0';
     IsAuipc     <= '0';
+    Ecall       <= '0';
     MemRead     <= '0';
     MemWrite    <= '0';
     MemToReg    <= '0';
@@ -84,6 +87,10 @@ begin
             IsAuipc  <= '1';
             RegWrite <= '1';
             ALUSrc   <= '1';
+        when ECALL_OP =>
+            -- ECALL não escreve registrador nem memória por si só; o efeito
+            -- (PrintInt/PrintString/Exit) é tratado à parte no datapath.
+            Ecall <= '1';
         -- Instrução inválida
         when others =>
             null;

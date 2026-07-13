@@ -1,0 +1,14 @@
+.claude/
+
+# Ignorar a pasta de simulação dedicada
+sim/
+build/
+
+# Garantia para arquivos soltos do ModelSim (caso algum arquivo compile fora sem querer)
+work/
+rtl_work/
+*.wlf
+*.mpf
+*.ini
+transcript
+vsim.wlf

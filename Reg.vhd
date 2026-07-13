@@ -9,7 +9,11 @@ entity REG is
   port (
     d            : in std_logic_vector(WSIZE-1 downto 0);
     clk, clr, ld : in std_logic;
-    q            : out std_logic_vector(WSIZE-1 downto 0)
+    -- valor padrão explícito: garante que "q" comece definido (zero) a
+    -- partir do primeiríssimo ciclo delta da simulação, sem depender da
+    -- ordem em que os processos são avaliados pela primeira vez (ver
+    -- log/08-registrador-sem-valor-padrao-na-porta.md)
+    q            : out std_logic_vector(WSIZE-1 downto 0) := (others => '0')
   );
 end REG;
 -- d   : data in

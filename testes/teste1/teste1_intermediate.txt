@@ -1,0 +1,41 @@
+; arquivo intermediário gerado automaticamente — NÃO é o fonte original.
+; PC_REL_HALVED = True
+;
+; símbolos de .text (ROM):
+;   0x0000  main
+;   0x000c  outer
+;   0x0028  inner
+;   0x0048  no_swap
+;   0x0054  end_inner
+;   0x005c  end_outer
+;
+; símbolos de .data (RAM):
+;   0x0000  arr
+;
+
+0x0000:  00000513   addi a0, zero, 0
+0x0004:  00A00293   addi t0, zero, 10
+0x0008:  00000413   addi s0, zero, 0
+0x000c:  00900313   addi t1, zero, 9
+0x0010:  00642FB3   slt t6, s0, t1
+0x0014:  020F8263   beq t6, zero, 0x005c  (offset=72)
+0x0018:  00000493   addi s1, zero, 0
+0x001c:  00050913   addi s2, a0, 0
+0x0020:  408283B3   sub t2, t0, s0
+0x0024:  FFF38393   addi t2, t2, -1
+0x0028:  0074AFB3   slt t6, s1, t2
+0x002c:  000F8A63   beq t6, zero, 0x0054  (offset=40)
+0x0030:  00092E03   lw t3, 0(s2)
+0x0034:  00492E83   lw t4, 4(s2)
+0x0038:  01CEAFB3   slt t6, t4, t3
+0x003c:  000F8363   beq t6, zero, 0x0048  (offset=12)
+0x0040:  01D92023   sw t4, 0(s2)
+0x0044:  01C92223   sw t3, 4(s2)
+0x0048:  00490913   addi s2, s2, 4
+0x004c:  00148493   addi s1, s1, 1
+0x0050:  FEDFF06F   jal zero, 0x0028  (offset=-40)
+0x0054:  00140413   addi s0, s0, 1
+0x0058:  FDBFF06F   jal zero, 0x000c  (offset=-76)
+0x005c:  00000513   addi a0, zero, 0
+0x0060:  05D00893   addi a7, zero, 93
+0x0064:  00000073   ecall

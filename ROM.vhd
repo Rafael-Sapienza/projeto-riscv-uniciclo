@@ -7,9 +7,10 @@ use std.textio.all;
 -- ROM
 entity ROM is
   generic (
-    WSIZE : integer := 32;
-    ASIZE : integer := 11;
-    ROMDP : integer := (2**ASIZE)
+    WSIZE     : integer := 32;
+    ASIZE     : integer := 11;
+    ROMDP     : integer := (2**ASIZE);
+    INIT_FILE : string  := "data.txt"
   );
   port (
     addr : in std_logic_vector(ASIZE-1 downto 0);
@@ -21,16 +22,22 @@ architecture arom of ROM is
 
 type out_vec is array(0 to ROMDP-1) of std_logic_vector(WSIZE-1 downto 0);
 
--- Função para ler "data.txt" e retornar um vetor memória
+-- Função para ler o arquivo de instruções (INIT_FILE) e retornar um vetor
+-- memória. Lê uma palavra (linha) por endereço, começando em 0, até
+-- encontrar o fim do arquivo OU até preencher todos os ROMDP endereços —
+-- o que ocorrer primeiro. Os endereços não preenchidos permanecem
+-- zerados (valor inicial de rom_data), então o arquivo de entrada não
+-- precisa mais ser preenchido com zeros até a profundidade da ROM.
 impure function init_rom_hex return out_vec is
-  file text_file     : text open read_mode is "data.txt";
+  file text_file     : text open read_mode is INIT_FILE;
   variable text_line : line;
-  variable rom_data  : out_vec;
+  variable rom_data  : out_vec := (others => (others => '0'));
+  variable idx       : integer := 0;
 begin
-
-  for II in 0 to ROMDP - 1 loop
+  while idx < ROMDP and not endfile(text_file) loop
     readline(text_file, text_line);
-    hread(text_line, rom_data(II));
+    hread(text_line, rom_data(idx));
+    idx := idx + 1;
   end loop;
 
   return rom_data;

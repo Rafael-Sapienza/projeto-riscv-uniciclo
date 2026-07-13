@@ -12,20 +12,34 @@ entity XREGS is
   );
   port (
     clk, wren    : in std_logic;
+    reset        : in std_logic := '1'; -- limpa todos os registradores (ver CPU.vhd)
     rs1, rs2, rd : in std_logic_vector(RADRR-1 downto 0);
     data         : in std_logic_vector(WSIZE-1 downto 0);
-    ro1, ro2     : out std_logic_vector(WSIZE-1 downto 0)
+    ro1, ro2     : out std_logic_vector(WSIZE-1 downto 0);
+    ro_a0, ro_a7 : out std_logic_vector(WSIZE-1 downto 0);
+    -- porta de depuração (temporária): leitura combinacional de QUALQUER
+    -- registrador por número, usada só para trace/debug (ver CPU.vhd)
+    dbg_rnum     : in  std_logic_vector(RADRR-1 downto 0) := (others => '0');
+    dbg_rval     : out std_logic_vector(WSIZE-1 downto 0)
   );
 end XREGS;
 -- clk      : clock
 -- wren     : write enable
+-- reset    : limpa todos os registradores (x1..x31) de forma assíncrona
 -- rs1, rs2 : register 1/2 for reading
 -- rd       : register for writing
 -- data     : data for writing
 -- ro1, ro2 : output of register 1/2
+-- ro_a0, ro_a7 : leitura combinacional (independente de rs1/rs2) dos
+--                registradores a0 (x10) e a7 (x17), usada pelo ecall
+-- dbg_rnum/dbg_rval : porta de depuração (ver acima)
 
 
 architecture xreg of XREGS is
+
+-- Endereços ABI fixos usados pela convenção de chamada de sistema (ecall)
+constant A0_REG : natural := 10;
+constant A7_REG : natural := 17;
 
 component REG is
   port (
@@ -35,7 +49,7 @@ component REG is
   );
 end component;
 
-signal xclr, xld : std_logic_vector(0 to RAMNT-1) := (others => '0');
+signal xld : std_logic_vector(0 to RAMNT-1) := (others => '0');
 
 type out_vec is array(0 to RAMNT-1) of std_logic_vector(WSIZE-1 downto 0);
 signal out_q : out_vec := (others => (others => '0'));
@@ -51,11 +65,11 @@ begin
   -- x0 nao gera, caso desejavel troque (1 to RAMNT-1) por (0 to RAMNT-1)
   GENREGS:
   for I in 1 to RAMNT-1 generate
-    REGX: REG port map (data, clk, xclr(I), xld(I), out_q(I));
+    REGX: REG port map (data, clk, reset, xld(I), out_q(I));
   end generate GENREGS;
 
   -- processa valor de rs1 pendente
-  settleR1: process(rs1, xclr)
+  settleR1: process(rs1)
   begin
     if to_integer(unsigned(rs1)) = 0 then
       -- x0 eh constante zero
@@ -66,7 +80,7 @@ begin
   end process settleR1;
 
   -- processa valor de rs2 pendente
-  settleR2: process(rs2, xclr)
+  settleR2: process(rs2)
   begin
     if to_integer(unsigned(rs2)) = 0 then
       -- x0 eh constante zero
@@ -88,14 +102,26 @@ begin
     end if;
   end process settleWr;
 
-  -- batida do clock troca saida
-  mainp: process(clk)
-  begin
-    out_q(0) <= (others => '0');
-    if rising_edge(clk) then
-      ro1 <= dr1;
-      ro2 <= dr2;
-    end if;
-  end process mainp;
+  -- x0 (índice 0) nunca é gerado como REG (ver GENREGS acima); mantém a
+  -- posição zerada por conta própria
+  out_q(0) <= (others => '0');
+
+  -- leitura combinacional de rd1/rd2: numa CPU uniciclo, rd1/rd2 precisam
+  -- refletir rs1/rs2 DA INSTRUÇÃO ATUAL, no MESMO ciclo (não da instrução
+  -- anterior). Antes, isso estava dentro de um processo síncrono
+  -- (`if rising_edge(clk) then ro1<=dr1; ...`), o que atrasava rd1/rd2 em
+  -- 1 ciclo -- todo ALU/branch/etc. acabava operando com os operandos da
+  -- instrução ANTERIOR em vez da atual (bug real, confirmado simulando a
+  -- CPU: os valores de registrador chegavam sempre um ciclo atrasados).
+  ro1 <= dr1;
+  ro2 <= dr2;
+
+  -- leitura combinacional de a0/a7, independente dos campos rs1/rs2 da
+  -- instrução corrente (necessária para o ecall, cuja codificação não
+  -- referencia esses registradores através de rs1/rs2)
+  ro_a0 <= out_q(A0_REG);
+  ro_a7 <= out_q(A7_REG);
+
+  dbg_rval <= out_q(to_integer(unsigned(dbg_rnum)));
 
 end xreg;
