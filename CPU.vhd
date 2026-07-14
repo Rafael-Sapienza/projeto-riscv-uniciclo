@@ -83,7 +83,9 @@ component RAM is
     dbg_addr : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
     dbg_byte : out std_logic_vector(BSIZE-1 downto 0);
     tb_addr  : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
-    tb_word  : out std_logic_vector(WSIZE-1 downto 0)
+    tb_word  : out std_logic_vector(WSIZE-1 downto 0);
+    trc_addr : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
+    trc_word : out std_logic_vector(WSIZE-1 downto 0)
   );
 end component RAM;
 
@@ -213,6 +215,11 @@ signal dmOUT : std_logic_vector(WSIZE-1 downto 0);
 signal dbgAddr : std_logic_vector(RAMSIZE-1 downto 0) := (others => '0'); -- endereço de depuração (ecall PrintString)
 signal dbgByte : std_logic_vector(7 downto 0);
 
+-- Depuração (temporária): leitura de 1 palavra da RAM por endereço, uso
+-- exclusivo do trace de execução (tracePr, controlado por TRACE_CYCLES)
+signal trcAddr : std_logic_vector(RAMSIZE-1 downto 0) := (others => '0');
+signal trcWord : std_logic_vector(WSIZE-1 downto 0);
+
 -- Depuração (temporária): leitura de qualquer registrador por número, só
 -- para o trace controlado por TRACE_CYCLES
 signal dbgRnum : std_logic_vector(RADRR-1 downto 0) := (others => '0');
@@ -262,7 +269,7 @@ begin
   -- Data Memory
   ramDM: RAM
     generic map(WSIZE => WSIZE, ASIZE => RAMSIZE, INIT_FILE => RAM_FILE)
-    port map(clk, ctrlMemWr, cnstZERO, cnstZERO, dmAddr, rd2, dmOUT, dbgAddr, dbgByte, dump_addr, dump_word);
+    port map(clk, ctrlMemWr, cnstZERO, cnstZERO, dmAddr, rd2, dmOUT, dbgAddr, dbgByte, dump_addr, dump_word, trcAddr, trcWord);
 
 
 
@@ -301,14 +308,24 @@ begin
     end case;
   end process muxJALR;
 
-  -- BEQ (funct3=000) e BNE (funct3=001) usam o MESMO ALUControl (SUB, ver
-  -- ALUControl.vhdl) e portanto o mesmo aluZERO ("A=B?"); o bit0 de
-  -- Ifunct3 é exatamente o que diferencia BEQ de BNE, então usamos ele
-  -- para inverter a condição de desvio quando for BNE (desvia se A/=B).
+  -- BEQ usa SUB (ver ALUControl.vhdl) e desvia quando aluZERO ("A-B=0",
+  -- ou seja A=B). Todos os outros branches (BNE, BLT, BGE, BLTU, BGEU)
+  -- desviam quando aluZERO='0':
+  --   - BNE tambem usa SUB -- aluZERO=0 significa A/=B, exatamente a
+  --     condicao de desvio.
+  --   - BLT/BGE/BLTU/BGEU usam os comparadores da ULA (uSLT/uSGE/uSLTU/
+  --     uSGEU), que ja produzem a32=1 (condicao satisfeita) ou a32=0
+  --     diretamente -- e aluZERO="a32=0", entao aluZERO=0 <=> a32=1 <=>
+  --     branch tomado, sem precisar de nenhum tratamento especial por
+  --     instrucao.
   lgmuxPC: process(ctrlBranch, aluZERO, ctrlJAL, Ifunct3)
   begin
     if ctrlBranch = '1' then
-      ctrlMpc <= aluZERO xor Ifunct3(0);
+      if Ifunct3 = "000" then
+        ctrlMpc <= aluZERO;       -- BEQ
+      else
+        ctrlMpc <= not aluZERO;   -- BNE, BLT, BGE, BLTU, BGEU
+      end if;
     else
       ctrlMpc <= ctrlJAL;
     end if;
@@ -410,17 +427,36 @@ begin
       v := dbgRval;
     end procedure read_reg;
 
-    variable v_s0, v_s1, v_s2, v_t2, v_t3, v_t4, v_t6 : std_logic_vector(WSIZE-1 downto 0);
+    -- lê 1 palavra da RAM (endereço em bytes) através da porta de
+    -- depuração trcAddr/trcWord -- uso exclusivo deste trace
+    procedure read_mem(byte_addr : in integer; w : out std_logic_vector(WSIZE-1 downto 0)) is
+    begin
+      trcAddr <= std_logic_vector(to_unsigned(byte_addr, RAMSIZE));
+      wait for 1 ns;
+      w := trcWord;
+    end procedure read_mem;
+
+    -- ra/sp/a0/a1/s0-s3: registradores relevantes para depurar chamadas
+    -- de função (call/ret via auipc+jalr), usados por testes recursivos
+    -- como o quicksort (ver testes/teste2)
+    variable v_ra, v_sp, v_a0, v_a1, v_s0, v_s1, v_s2, v_s3 : std_logic_vector(WSIZE-1 downto 0);
+    -- conteúdo da RAM nos endereços 4068 (slot de s1) e 4076 (slot de ra)
+    -- do quadro de pilha de "partition", para depurar diretamente se a
+    -- gravação (sw) ou a leitura de volta (lw) é que está incorreta
+    variable v_mem4068, v_mem4076 : std_logic_vector(WSIZE-1 downto 0);
   begin
     wait until rising_edge(clk);
     if TRACE_CYCLES > 0 and n < TRACE_CYCLES then
-      read_reg(8,  v_s0); -- s0
-      read_reg(9,  v_s1); -- s1
-      read_reg(18, v_s2); -- s2
-      read_reg(7,  v_t2); -- t2
-      read_reg(28, v_t3); -- t3
-      read_reg(29, v_t4); -- t4
-      read_reg(31, v_t6); -- t6
+      read_reg(1,  v_ra); -- ra (x1)
+      read_reg(2,  v_sp); -- sp (x2)
+      read_reg(10, v_a0); -- a0 (x10)
+      read_reg(11, v_a1); -- a1 (x11)
+      read_reg(8,  v_s0); -- s0 (x8)
+      read_reg(9,  v_s1); -- s1 (x9)
+      read_reg(18, v_s2); -- s2 (x18)
+      read_reg(19, v_s3); -- s3 (x19)
+      read_mem(4068, v_mem4068);
+      read_mem(4076, v_mem4076);
 
       write(l, string'("step="));
       write(l, n);
@@ -428,20 +464,36 @@ begin
       hwrite(l, pcOUT);
       write(l, string'(" instr="));
       hwrite(l, imOUT);
+      write(l, string'(" ra="));
+      hwrite(l, v_ra);
+      write(l, string'(" sp="));
+      write(l, to_integer(unsigned(v_sp)));
+      write(l, string'(" a0="));
+      write(l, to_integer(signed(v_a0)));
+      write(l, string'(" a1="));
+      write(l, to_integer(signed(v_a1)));
       write(l, string'(" s0="));
       write(l, to_integer(signed(v_s0)));
       write(l, string'(" s1="));
       write(l, to_integer(signed(v_s1)));
       write(l, string'(" s2="));
-      hwrite(l, v_s2);
-      write(l, string'(" t2="));
-      write(l, to_integer(signed(v_t2)));
-      write(l, string'(" t3="));
-      write(l, to_integer(signed(v_t3)));
-      write(l, string'(" t4="));
-      write(l, to_integer(signed(v_t4)));
-      write(l, string'(" t6="));
-      write(l, to_integer(unsigned(v_t6)));
+      write(l, to_integer(signed(v_s2)));
+      write(l, string'(" s3="));
+      write(l, to_integer(signed(v_s3)));
+      write(l, string'(" we="));
+      if ctrlMemWr = '1' then
+        write(l, string'("1"));
+      else
+        write(l, string'("0"));
+      end if;
+      write(l, string'(" dmAddr="));
+      write(l, to_integer(unsigned(dmAddr)));
+      write(l, string'(" rd2="));
+      hwrite(l, rd2);
+      write(l, string'(" mem4068="));
+      hwrite(l, v_mem4068);
+      write(l, string'(" mem4076="));
+      hwrite(l, v_mem4076);
       writeline(output, l);
 
       n := n + 1;

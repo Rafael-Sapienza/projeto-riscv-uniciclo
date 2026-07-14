@@ -68,8 +68,17 @@ begin
     REGX: REG port map (data, clk, reset, xld(I), out_q(I));
   end generate GENREGS;
 
-  -- processa valor de rs1 pendente
-  settleR1: process(rs1)
+  -- processa valor de rs1 pendente. IMPORTANTE: sensível também a "out_q"
+  -- (não só a "rs1") -- senão, sempre que a instrução ATUAL ler o MESMO
+  -- registrador que a instrução ANTERIOR acabou de escrever (ex.: "addi
+  -- sp,sp,-20" seguido de "sw ra,16(sp)", ambos com rs1=sp), "rs1" não
+  -- muda de valor entre as duas instruções e este processo não é
+  -- reativado -- "dr1" continua mostrando o conteúdo ANTIGO de out_q(rs1),
+  -- de antes da escrita mais recente (o mesmo tipo de bug documentado em
+  -- log/06-porta-depuracao-sensibilidade-incompleta.md, desta vez no
+  -- próprio caminho de leitura de registradores, não numa porta de
+  -- depuração).
+  settleR1: process(rs1, out_q)
   begin
     if to_integer(unsigned(rs1)) = 0 then
       -- x0 eh constante zero
@@ -79,8 +88,8 @@ begin
     end if;
   end process settleR1;
 
-  -- processa valor de rs2 pendente
-  settleR2: process(rs2)
+  -- processa valor de rs2 pendente (mesmo raciocínio de settleR1)
+  settleR2: process(rs2, out_q)
   begin
     if to_integer(unsigned(rs2)) = 0 then
       -- x0 eh constante zero

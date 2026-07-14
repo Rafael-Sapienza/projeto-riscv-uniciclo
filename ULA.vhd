@@ -58,9 +58,20 @@ begin
       when uAND  => a32 <= A and B;
       when uOR   => a32 <= A or B;
       when uXOR  => a32 <= A xor B;
-      when uSLL  => a32 <= std_logic_vector(shift_left(unsigned(A), to_integer(unsigned(B))));
-      when uSRL  => a32 <= std_logic_vector(shift_right(unsigned(A), to_integer(unsigned(B))));
-      when uSRA  => a32 <= std_logic_vector(shift_right(signed(A), to_integer(unsigned(B))));
+      -- RV32I so considera os 5 bits menos significativos de B como
+      -- quantidade de deslocamento (shamt), mesmo quando B vem de um
+      -- registrador (SLL/SRL/SRA tipo R, com qualquer valor de 32 bits).
+      -- Sem o corte para B(4 downto 0), to_integer(unsigned(B)) recebe o
+      -- valor de 32 bits inteiro: se o bit mais alto de B estiver ligado
+      -- (valor sem sinal >= 2^31), a conversao estoura o intervalo de
+      -- NATURAL e o ModelSim acusa "TO_INTEGER: Value ... is not in
+      -- bounds of subtype NATURAL". Para SLLI/SRLI/SRAI (B = imediato)
+      -- isso e inofensivo, pois o genImm32 ja entrega o shamt isolado e
+      -- zero-estendido (ver ImmGen.vhd, tipo ITS) -- o corte so muda o
+      -- resultado de fato no caso tipo R.
+      when uSLL  => a32 <= std_logic_vector(shift_left(unsigned(A), to_integer(unsigned(B(4 downto 0)))));
+      when uSRL  => a32 <= std_logic_vector(shift_right(unsigned(A), to_integer(unsigned(B(4 downto 0)))));
+      when uSRA  => a32 <= std_logic_vector(shift_right(signed(A), to_integer(unsigned(B(4 downto 0)))));
       when uSLT  =>
         if (signed(A) < signed(B)) then
           a32 <= X"00000001";

@@ -40,6 +40,15 @@ entity tb_uRV is
     RAMSIZE       : integer := 13;                       -- deve bater com o generic RAMSIZE da uRV
     ROMSIZE       : integer := 11;                       -- deve bater com o generic ROMSIZE da uRV
     TRACE_CYCLES  : integer := 0;                        -- > 0: liga o trace de depuração da CPU (ver CPU.vhd)
+    -- Programas SEM pilha de chamadas (ex.: teste1, bubble sort) não
+    -- tocam em nenhum endereço além do que EXPECTED_FILE cobre, então
+    -- todo o restante da RAM realmente deve estar zerado -- daí o
+    -- default 'true'. Programas COM pilha (ex.: teste2, quicksort
+    -- recursivo) usam e legitimamente deixam resíduo não-zerado em
+    -- endereços de pilha ao final da execução (dar "pop" num quadro só
+    -- move o sp de volta, não apaga o que estava lá); nesse caso, passe
+    -- CHECK_TAIL_ZERO=false para não gerar falsos positivos.
+    CHECK_TAIL_ZERO : boolean := true;
     CLK_PERIOD    : time    := 10 ns
   );
 end entity tb_uRV;
@@ -159,17 +168,20 @@ begin
         file_close(exp_file);
 
         -- o restante da RAM (alem do que o arquivo esperado cobre) precisa
-        -- estar zerado
-        while addr <= RAMDP_C - 4 loop
-          read_ram_word(addr, got_word);
-          if got_word /= x"00000000" then
-            report "endereco " & integer'image(addr) &
-                   " deveria estar zerado, mas contem " &
-                   to_hstring(unsigned(got_word)) severity error;
-            errors := errors + 1;
-          end if;
-          addr := addr + 4;
-        end loop;
+        -- estar zerado -- só faz sentido para programas que não usam
+        -- pilha de chamadas (ver CHECK_TAIL_ZERO acima)
+        if CHECK_TAIL_ZERO then
+          while addr <= RAMDP_C - 4 loop
+            read_ram_word(addr, got_word);
+            if got_word /= x"00000000" then
+              report "endereco " & integer'image(addr) &
+                     " deveria estar zerado, mas contem " &
+                     to_hstring(unsigned(got_word)) severity error;
+              errors := errors + 1;
+            end if;
+            addr := addr + 4;
+          end loop;
+        end if;
 
         did_compare := true;
       end if;
@@ -201,9 +213,16 @@ begin
     -- para ficar fácil de achar no fim do transcript
     if did_compare then
       if errors = 0 then
-        write(msg_line, string'("Sucesso!!! :) RAM final confere com ") & EXPECTED_FILE &
-              " (" & integer'image(exp_lines) &
-              " palavra(s) verificada(s), restante zerado).");
+        if CHECK_TAIL_ZERO then
+          write(msg_line, string'("Sucesso!!! :) RAM final confere com ") & EXPECTED_FILE &
+                " (" & integer'image(exp_lines) &
+                " palavra(s) verificada(s), restante zerado).");
+        else
+          write(msg_line, string'("Sucesso!!! :) RAM final confere com ") & EXPECTED_FILE &
+                " (" & integer'image(exp_lines) & " palavra(s) verificada(s); " &
+                "verificacao de zeros no restante da RAM desativada -- " &
+                "CHECK_TAIL_ZERO=false).");
+        end if;
         writeline(output, msg_line);
       else
         write(msg_line, string'("Falha! ") & integer'image(errors) &

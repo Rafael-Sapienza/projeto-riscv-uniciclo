@@ -31,7 +31,13 @@ entity RAM is
     -- mostraram frágeis quanto à ordem de elaboração em algumas versões
     -- do ModelSim/Questa).
     tb_addr  : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
-    tb_word  : out std_logic_vector(WSIZE-1 downto 0)
+    tb_word  : out std_logic_vector(WSIZE-1 downto 0);
+    -- porta de depuração (palavra, temporária): igual a tb_addr/tb_word,
+    -- mas de uso exclusivo do trace interno da CPU (ver CPU.vhd/tracePr)
+    -- -- uma porta separada evita qualquer disputa de driver com
+    -- dump_addr/dump_word (dirigida de fora, pelo testbench).
+    trc_addr : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
+    trc_word : out std_logic_vector(WSIZE-1 downto 0)
   );
 end RAM;
 --  BSIZE   : byte size
@@ -86,14 +92,8 @@ begin
 end function;
 
 signal mem : out_vec := init_mem;
-signal INTaddr : integer := 0;
 
 begin
-
-  ram_ad: process(addr)
-  begin
-    INTaddr <= to_integer(unsigned(addr));
-  end process ram_ad;
 
   -- IMPORTANTE: sensível também a "mem" (não só ao endereço) -- senão,
   -- sempre que o endereço de depuração NÃO mudar de valor entre duas
@@ -116,57 +116,80 @@ begin
     end if;
   end process tb_pr;
 
+  trc_pr: process(trc_addr, mem)
+    variable idx : integer;
+  begin
+    idx := to_integer(unsigned(trc_addr));
+    if idx <= RAMDP - 4 then
+      trc_word <= mem(idx) & mem(idx+1) & mem(idx+2) & mem(idx+3);
+    end if;
+  end process trc_pr;
+
   -- leitura combinacional (assíncrona): numa CPU uniciclo, o dado do "lw"
   -- precisa estar disponível no MESMO ciclo em que o endereço é calculado,
   -- não no ciclo seguinte. Antes, esta leitura estava dentro de
   -- `if rising_edge(clk)`, ou seja, "dataout" só refletia o endereço do
   -- ciclo ANTERIOR -- bug real, confirmado simulando a CPU (lw lia o
   -- valor de um ciclo atrás em vez do endereço atual).
-  read_pr: process(INTaddr, byte_en, sgn_en, addr, mem)
+  --
+  -- O índice é calculado numa VARIÁVEL local (idx), não num sinal
+  -- separado computado por outro processo (como havia antes, em
+  -- "INTaddr"/"ram_ad"): um sinal derivado por um processo à parte
+  -- sempre carrega um ciclo delta de atraso em relação à sua fonte, o
+  -- que abre uma janela onde este processo pode ser reativado por causa
+  -- de "addr" ter mudado, mas ainda enxergar o valor ANTIGO do sinal
+  -- derivado -- combinação inconsistente que, num caso de borda, chegou
+  -- a passar no teste de alinhamento com um índice fora dos limites do
+  -- array (ver log/09-condicao-de-corrida-indice-ram.md). Uma variável
+  -- local não tem esse atraso: é recalculada por inteiro a cada vez que
+  -- o processo roda.
+  read_pr: process(addr, byte_en, sgn_en, mem)
+    variable idx : integer;
   begin
+    idx := to_integer(unsigned(addr));
     if (byte_en = '1') then
       -- read byte
       if (sgn_en = '1') then
         -- signed byte
-        dataout <= std_logic_vector(resize(signed(mem(INTaddr)), WSIZE));
+        dataout <= std_logic_vector(resize(signed(mem(idx)), WSIZE));
       else
         -- unsigned byte
-        dataout <= std_logic_vector(resize(unsigned(mem(INTaddr)), WSIZE));
+        dataout <= std_logic_vector(resize(unsigned(mem(idx)), WSIZE));
       end if;
     else
       -- read word, verificar addr antes de operar. A checagem extra
-      -- "INTaddr <= RAMDP-4" evita estourar o array em avaliações
-      -- transitórias (delta-cycle) de "addr" ainda não completamente
-      -- assentado -- embora o endereço final de qualquer instrução real
-      -- nunca ultrapasse os limites da RAM (verificado por simulação de
-      -- referência), o processo é reavaliado a cada mudança em "mem", e
-      -- um valor intermediário/transitório de "addr" pode, por uma
-      -- fração de delta-cycle, aparentar estar alinhado sem realmente
-      -- estar dentro dos limites (ver log/09-estouro-transitorio-do-indice-da-ram.md)
-      if addr(0) = '0' and addr(1) = '0' and INTaddr <= RAMDP - 4 then
+      -- "idx <= RAMDP-4" é uma segunda linha de defesa contra qualquer
+      -- estouro do array, mesmo que o endereço final de toda instrução
+      -- real já tenha sido verificado (por simulação de referência) como
+      -- sempre dentro dos limites da RAM.
+      if addr(0) = '0' and addr(1) = '0' and idx <= RAMDP - 4 then
         -- little-endian
-        dataout <= mem(INTaddr) & mem(INTaddr+1) & mem(INTaddr+2) & mem(INTaddr+3);
+        dataout <= mem(idx) & mem(idx+1) & mem(idx+2) & mem(idx+3);
       end if;
     end if;
   end process read_pr;
 
-  -- escrita síncrona (correta: escritas devem acontecer na borda de clock)
+  -- escrita síncrona (correta: escritas devem acontecer na borda de clock).
+  -- Mesmo raciocínio de "read_pr": índice calculado localmente, sem
+  -- depender de um sinal derivado por outro processo.
   write_pr: process(clk)
+    variable idx : integer;
   begin
     if rising_edge(clk) then
+      idx := to_integer(unsigned(addr));
       if (we = '1') then
         if (byte_en = '1') then
           -- byte write
-          mem(INTaddr) <= datain(BSIZE-1 downto 0);
+          mem(idx) <= datain(BSIZE-1 downto 0);
         else
           -- word write, verificar addr antes de operar (mesma guarda
           -- extra de limites usada em read_pr)
-          if addr(0) = '0' and addr(1) = '0' and INTaddr <= RAMDP - 4 then
+          if addr(0) = '0' and addr(1) = '0' and idx <= RAMDP - 4 then
             -- little-endian
-            mem(INTaddr+0) <= datain(BSIZE*4-1 downto BSIZE*3);
-            mem(INTaddr+1) <= datain(BSIZE*3-1 downto BSIZE*2);
-            mem(INTaddr+2) <= datain(BSIZE*2-1 downto BSIZE*1);
-            mem(INTaddr+3) <= datain(BSIZE*1-1 downto BSIZE*0);
+            mem(idx+0) <= datain(BSIZE*4-1 downto BSIZE*3);
+            mem(idx+1) <= datain(BSIZE*3-1 downto BSIZE*2);
+            mem(idx+2) <= datain(BSIZE*2-1 downto BSIZE*1);
+            mem(idx+3) <= datain(BSIZE*1-1 downto BSIZE*0);
           end if;
         end if;
       end if;

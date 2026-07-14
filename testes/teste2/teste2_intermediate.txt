@@ -4,11 +4,11 @@
 ; símbolos de .text (ROM):
 ;   0x0000  main
 ;   0x0020  quicksort
-;   0x0084  qs_ret
-;   0x0088  partition
-;   0x00c0  part_loop
-;   0x00fc  part_skip
-;   0x0104  part_loop_end
+;   0x0080  qs_ret
+;   0x0084  partition
+;   0x00bc  part_loop
+;   0x00f0  part_skip
+;   0x00f8  part_loop_end
 ;
 ; símbolos de .data (RAM):
 ;   0x0000  arr
@@ -22,78 +22,75 @@
 0x0014:  00000513   addi a0, zero, 0
 0x0018:  05D00893   addi a7, zero, 93
 0x001c:  00000073   ecall
-0x0020:  00B52FB3   slt t6, a0, a1
-0x0024:  020F8863   beq t6, zero, 0x0084  (offset=96)
-0x0028:  FF010113   addi sp, sp, -16
-0x002c:  00112623   sw ra, 12(sp)
-0x0030:  00812423   sw s0, 8(sp)
-0x0034:  00912223   sw s1, 4(sp)
-0x0038:  01212023   sw s2, 0(sp)
-0x003c:  00050413   addi s0, a0, 0
-0x0040:  00058493   addi s1, a1, 0
-0x0044:  00000097   auipc ra, 0x0
-0x0048:  044080E7   jalr ra, 68(ra)
-0x004c:  00050913   addi s2, a0, 0
-0x0050:  00040513   addi a0, s0, 0
-0x0054:  FFF90593   addi a1, s2, -1
-0x0058:  00000097   auipc ra, 0x0
-0x005c:  FC8080E7   jalr ra, -56(ra)
-0x0060:  00190513   addi a0, s2, 1
-0x0064:  00048593   addi a1, s1, 0
-0x0068:  00000097   auipc ra, 0x0
-0x006c:  FB8080E7   jalr ra, -72(ra)
-0x0070:  00012903   lw s2, 0(sp)
-0x0074:  00412483   lw s1, 4(sp)
-0x0078:  00812403   lw s0, 8(sp)
-0x007c:  00C12083   lw ra, 12(sp)
-0x0080:  01010113   addi sp, sp, 16
-0x0084:  00008067   jalr zero, 0(ra)
-0x0088:  FEC10113   addi sp, sp, -20
-0x008c:  00112823   sw ra, 16(sp)
-0x0090:  00812623   sw s0, 12(sp)
-0x0094:  00912423   sw s1, 8(sp)
-0x0098:  01212223   sw s2, 4(sp)
-0x009c:  01312023   sw s3, 0(sp)
-0x00a0:  00050413   addi s0, a0, 0
-0x00a4:  00058493   addi s1, a1, 0
-0x00a8:  00000293   addi t0, zero, 0
-0x00ac:  00249313   slli t1, s1, 2
-0x00b0:  00628333   add t1, t0, t1
-0x00b4:  00032983   lw s3, 0(t1)
-0x00b8:  FFF40913   addi s2, s0, -1
-0x00bc:  00040393   addi t2, s0, 0
-0x00c0:  0093AFB3   slt t6, t2, s1
-0x00c4:  020F8063   beq t6, zero, 0x0104  (offset=64)
-0x00c8:  00000293   addi t0, zero, 0
-0x00cc:  00239313   slli t1, t2, 2
-0x00d0:  00628333   add t1, t0, t1
-0x00d4:  00032E03   lw t3, 0(t1)
-0x00d8:  01C9AFB3   slt t6, s3, t3
-0x00dc:  000F9863   bne t6, zero, 0x00fc  (offset=32)
-0x00e0:  00190913   addi s2, s2, 1
-0x00e4:  00000293   addi t0, zero, 0
-0x00e8:  00291E93   slli t4, s2, 2
-0x00ec:  01D28EB3   add t4, t0, t4
-0x00f0:  000EAF03   lw t5, 0(t4)
-0x00f4:  01CEA023   sw t3, 0(t4)
-0x00f8:  01E32023   sw t5, 0(t1)
-0x00fc:  00138393   addi t2, t2, 1
-0x0100:  FE1FF06F   jal zero, 0x00c0  (offset=-64)
-0x0104:  00190913   addi s2, s2, 1
-0x0108:  00000293   addi t0, zero, 0
-0x010c:  00291313   slli t1, s2, 2
-0x0110:  00628333   add t1, t0, t1
-0x0114:  00032E03   lw t3, 0(t1)
-0x0118:  00249E93   slli t4, s1, 2
-0x011c:  01D28EB3   add t4, t0, t4
-0x0120:  000EAF03   lw t5, 0(t4)
-0x0124:  01E32023   sw t5, 0(t1)
-0x0128:  01CEA023   sw t3, 0(t4)
-0x012c:  00090513   addi a0, s2, 0
-0x0130:  00012983   lw s3, 0(sp)
-0x0134:  00412903   lw s2, 4(sp)
-0x0138:  00812483   lw s1, 8(sp)
-0x013c:  00C12403   lw s0, 12(sp)
-0x0140:  01012083   lw ra, 16(sp)
-0x0144:  01410113   addi sp, sp, 20
-0x0148:  00008067   jalr zero, 0(ra)
+0x0020:  02B55863   bge a0, a1, 0x0080  (offset=96)
+0x0024:  FF010113   addi sp, sp, -16
+0x0028:  00112623   sw ra, 12(sp)
+0x002c:  00812423   sw s0, 8(sp)
+0x0030:  00912223   sw s1, 4(sp)
+0x0034:  01212023   sw s2, 0(sp)
+0x0038:  00050413   addi s0, a0, 0
+0x003c:  00058493   addi s1, a1, 0
+0x0040:  00000097   auipc ra, 0x0
+0x0044:  044080E7   jalr ra, 68(ra)
+0x0048:  00050913   addi s2, a0, 0
+0x004c:  00040513   addi a0, s0, 0
+0x0050:  FFF90593   addi a1, s2, -1
+0x0054:  00000097   auipc ra, 0x0
+0x0058:  FCC080E7   jalr ra, -52(ra)
+0x005c:  00190513   addi a0, s2, 1
+0x0060:  00048593   addi a1, s1, 0
+0x0064:  00000097   auipc ra, 0x0
+0x0068:  FBC080E7   jalr ra, -68(ra)
+0x006c:  00012903   lw s2, 0(sp)
+0x0070:  00412483   lw s1, 4(sp)
+0x0074:  00812403   lw s0, 8(sp)
+0x0078:  00C12083   lw ra, 12(sp)
+0x007c:  01010113   addi sp, sp, 16
+0x0080:  00008067   jalr zero, 0(ra)
+0x0084:  FEC10113   addi sp, sp, -20
+0x0088:  00112823   sw ra, 16(sp)
+0x008c:  00812623   sw s0, 12(sp)
+0x0090:  00912423   sw s1, 8(sp)
+0x0094:  01212223   sw s2, 4(sp)
+0x0098:  01312023   sw s3, 0(sp)
+0x009c:  00050413   addi s0, a0, 0
+0x00a0:  00058493   addi s1, a1, 0
+0x00a4:  00000293   addi t0, zero, 0
+0x00a8:  00249313   slli t1, s1, 2
+0x00ac:  00628333   add t1, t0, t1
+0x00b0:  00032983   lw s3, 0(t1)
+0x00b4:  FFF40913   addi s2, s0, -1
+0x00b8:  00040393   addi t2, s0, 0
+0x00bc:  0093DF63   bge t2, s1, 0x00f8  (offset=60)
+0x00c0:  00000293   addi t0, zero, 0
+0x00c4:  00239313   slli t1, t2, 2
+0x00c8:  00628333   add t1, t0, t1
+0x00cc:  00032E03   lw t3, 0(t1)
+0x00d0:  01C9C863   blt s3, t3, 0x00f0  (offset=32)
+0x00d4:  00190913   addi s2, s2, 1
+0x00d8:  00000293   addi t0, zero, 0
+0x00dc:  00291E93   slli t4, s2, 2
+0x00e0:  01D28EB3   add t4, t0, t4
+0x00e4:  000EAF03   lw t5, 0(t4)
+0x00e8:  01CEA023   sw t3, 0(t4)
+0x00ec:  01E32023   sw t5, 0(t1)
+0x00f0:  00138393   addi t2, t2, 1
+0x00f4:  FE5FF06F   jal zero, 0x00bc  (offset=-56)
+0x00f8:  00190913   addi s2, s2, 1
+0x00fc:  00000293   addi t0, zero, 0
+0x0100:  00291313   slli t1, s2, 2
+0x0104:  00628333   add t1, t0, t1
+0x0108:  00032E03   lw t3, 0(t1)
+0x010c:  00249E93   slli t4, s1, 2
+0x0110:  01D28EB3   add t4, t0, t4
+0x0114:  000EAF03   lw t5, 0(t4)
+0x0118:  01E32023   sw t5, 0(t1)
+0x011c:  01CEA023   sw t3, 0(t4)
+0x0120:  00090513   addi a0, s2, 0
+0x0124:  00012983   lw s3, 0(sp)
+0x0128:  00412903   lw s2, 4(sp)
+0x012c:  00812483   lw s1, 8(sp)
+0x0130:  00C12403   lw s0, 12(sp)
+0x0134:  01012083   lw ra, 16(sp)
+0x0138:  01410113   addi sp, sp, 20
+0x013c:  00008067   jalr zero, 0(ra)

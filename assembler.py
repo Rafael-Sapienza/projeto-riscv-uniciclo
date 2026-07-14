@@ -231,56 +231,111 @@ class AssemblerError(Exception):
 
 
 # ======================================================================
+# CAMPOS DAS INSTRUÇÕES (opcode, funct3, funct7) COMO CONSTANTES NOMEADAS
+#
+# Mesmos valores/agrupamentos usados no datapath (ver Control.vhdl,
+# ALUCtrl.vhdl, ImmGen.vhd) -- nomear aqui facilita conferir a tabela de
+# instruções abaixo linha a linha contra o hardware, em vez de precisar
+# decorar/recontar bits de cada literal binário.
+# ======================================================================
+
+# --- opcode (instr[6:0]) ---
+OPCODE_R_TYPE  = 0b0110011  # ADD, SUB, SLL, SLT, SLTU, XOR, SRL, SRA, OR, AND
+OPCODE_I_ARITH = 0b0010011  # ADDI, SLTI, SLTIU, XORI, ORI, ANDI, SLLI, SRLI, SRAI
+OPCODE_LOAD    = 0b0000011  # LW
+OPCODE_STORE   = 0b0100011  # SW
+OPCODE_BRANCH  = 0b1100011  # BEQ, BNE
+OPCODE_JAL     = 0b1101111  # JAL
+OPCODE_JALR    = 0b1100111  # JALR
+OPCODE_LUI     = 0b0110111  # LUI
+OPCODE_AUIPC   = 0b0010111  # AUIPC
+OPCODE_SYSTEM  = 0b1110011  # ECALL
+
+# --- funct3 (instr[14:12]) -- mesmo campo, reaproveitado por par R/I ---
+FUNCT3_ADD_SUB       = 0b000  # ADD/SUB (R) e ADDI (I)
+FUNCT3_SLL           = 0b001  # SLL (R) e SLLI (I-shift)
+FUNCT3_SLT           = 0b010  # SLT (R) e SLTI (I)
+FUNCT3_SLTU          = 0b011  # SLTU (R) e SLTIU (I)
+FUNCT3_XOR           = 0b100  # XOR (R) e XORI (I)
+FUNCT3_SRL_SRA       = 0b101  # SRL/SRA (R) e SRLI/SRAI (I-shift)
+FUNCT3_OR            = 0b110  # OR (R) e ORI (I)
+FUNCT3_AND           = 0b111  # AND (R) e ANDI (I)
+FUNCT3_BEQ           = 0b000
+FUNCT3_BNE           = 0b001
+FUNCT3_BLT           = 0b100
+FUNCT3_BGE           = 0b101
+FUNCT3_BLTU          = 0b110
+FUNCT3_BGEU          = 0b111
+FUNCT3_WORD          = 0b010  # LW/SW -- única largura de acesso suportada
+FUNCT3_JALR          = 0b000
+FUNCT3_ECALL         = 0b000
+
+# --- funct7 (instr[31:25]) -- só varia para distinguir duas instruções
+# que dividem o mesmo opcode+funct3 ---
+FUNCT7_ZERO = 0b0000000  # "variante padrão": ADD, SLL, SLT, SLTU, XOR, SRL, OR, AND, SLLI, SRLI
+FUNCT7_ALT  = 0b0100000  # "variante alternativa": SUB, SRA, SRAI
+
+
+# ======================================================================
 # TABELA DE INSTRUÇÕES "REAIS" (não-pseudo)
 # formato: mnemonic -> (tipo, opcode, funct3, funct7)
 # ======================================================================
 
 INSTR_TABLE = {
     # R-type
-    "add":  ("R", 0b0110011, 0b000, 0b0000000),
-    "sub":  ("R", 0b0110011, 0b000, 0b0100000),
-    "sll":  ("R", 0b0110011, 0b001, 0b0000000),
-    "slt":  ("R", 0b0110011, 0b010, 0b0000000),
-    "sltu": ("R", 0b0110011, 0b011, 0b0000000),
-    "xor":  ("R", 0b0110011, 0b100, 0b0000000),
-    "srl":  ("R", 0b0110011, 0b101, 0b0000000),
-    "sra":  ("R", 0b0110011, 0b101, 0b0100000),
-    "or":   ("R", 0b0110011, 0b110, 0b0000000),
-    "and":  ("R", 0b0110011, 0b111, 0b0000000),
+    "add":  ("R", OPCODE_R_TYPE, FUNCT3_ADD_SUB, FUNCT7_ZERO),
+    "sub":  ("R", OPCODE_R_TYPE, FUNCT3_ADD_SUB, FUNCT7_ALT),
+    "sll":  ("R", OPCODE_R_TYPE, FUNCT3_SLL,     FUNCT7_ZERO),
+    "slt":  ("R", OPCODE_R_TYPE, FUNCT3_SLT,     FUNCT7_ZERO),
+    "sltu": ("R", OPCODE_R_TYPE, FUNCT3_SLTU,    FUNCT7_ZERO),
+    "xor":  ("R", OPCODE_R_TYPE, FUNCT3_XOR,     FUNCT7_ZERO),
+    "srl":  ("R", OPCODE_R_TYPE, FUNCT3_SRL_SRA, FUNCT7_ZERO),
+    "sra":  ("R", OPCODE_R_TYPE, FUNCT3_SRL_SRA, FUNCT7_ALT),
+    "or":   ("R", OPCODE_R_TYPE, FUNCT3_OR,      FUNCT7_ZERO),
+    "and":  ("R", OPCODE_R_TYPE, FUNCT3_AND,     FUNCT7_ZERO),
     # I-type aritmético
-    "addi": ("I-arith", 0b0010011, 0b000, None),
-    "slti": ("I-arith", 0b0010011, 0b010, None),
-    "sltiu":("I-arith", 0b0010011, 0b011, None),
-    "xori": ("I-arith", 0b0010011, 0b100, None),
-    "ori":  ("I-arith", 0b0010011, 0b110, None),
-    "andi": ("I-arith", 0b0010011, 0b111, None),
+    "addi": ("I-arith", OPCODE_I_ARITH, FUNCT3_ADD_SUB, None),
+    "slti": ("I-arith", OPCODE_I_ARITH, FUNCT3_SLT,     None),
+    "sltiu":("I-arith", OPCODE_I_ARITH, FUNCT3_SLTU,    None),
+    "xori": ("I-arith", OPCODE_I_ARITH, FUNCT3_XOR,     None),
+    "ori":  ("I-arith", OPCODE_I_ARITH, FUNCT3_OR,      None),
+    "andi": ("I-arith", OPCODE_I_ARITH, FUNCT3_AND,     None),
     # I-type shift (imediato = shamt de 5 bits)
-    "slli": ("I-shift", 0b0010011, 0b001, 0b0000000),
-    "srli": ("I-shift", 0b0010011, 0b101, 0b0000000),
-    "srai": ("I-shift", 0b0010011, 0b101, 0b0100000),
+    "slli": ("I-shift", OPCODE_I_ARITH, FUNCT3_SLL,     FUNCT7_ZERO),
+    "srli": ("I-shift", OPCODE_I_ARITH, FUNCT3_SRL_SRA, FUNCT7_ZERO),
+    "srai": ("I-shift", OPCODE_I_ARITH, FUNCT3_SRL_SRA, FUNCT7_ALT),
     # Load
-    "lw":   ("I-load", 0b0000011, 0b010, None),
+    "lw":   ("I-load", OPCODE_LOAD, FUNCT3_WORD, None),
     # Store
-    "sw":   ("S", 0b0100011, 0b010, None),
+    "sw":   ("S", OPCODE_STORE, FUNCT3_WORD, None),
     # Branch
-    "beq":  ("B", 0b1100011, 0b000, None),
-    "bne":  ("B", 0b1100011, 0b001, None),
+    "beq":  ("B", OPCODE_BRANCH, FUNCT3_BEQ, None),
+    "bne":  ("B", OPCODE_BRANCH, FUNCT3_BNE, None),
+    "blt":  ("B", OPCODE_BRANCH, FUNCT3_BLT, None),
+    "bge":  ("B", OPCODE_BRANCH, FUNCT3_BGE, None),
+    "bltu": ("B", OPCODE_BRANCH, FUNCT3_BLTU, None),
+    "bgeu": ("B", OPCODE_BRANCH, FUNCT3_BGEU, None),
     # Jump
-    "jal":  ("J", 0b1101111, None, None),
-    "jalr": ("I-jalr", 0b1100111, 0b000, None),
+    "jal":  ("J", OPCODE_JAL, None, None),
+    "jalr": ("I-jalr", OPCODE_JALR, FUNCT3_JALR, None),
     # Upper immediate
-    "lui":   ("U", 0b0110111, None, None),
-    "auipc": ("U", 0b0010111, None, None),
+    "lui":   ("U", OPCODE_LUI, None, None),
+    "auipc": ("U", OPCODE_AUIPC, None, None),
     # System (chamada de sistema — ver ControlUnit.Ecall/CPU.vhd)
-    "ecall": ("SYS", 0b1110011, 0b000, None),
+    "ecall": ("SYS", OPCODE_SYSTEM, FUNCT3_ECALL, None),
 }
 
 PSEUDO_OPS = {
     "nop", "mv", "not", "neg", "li", "la", "j", "jr", "ret", "beqz", "bnez",
     "sgt", "sgtu", "sltz", "sgtz", "seqz", "snez",
-    "blt", "bge", "bltu", "bgeu", "bgt", "ble",
+    "bgt", "ble",
     "call", "tail",
 }
+# 'blt'/'bge'/'bltu'/'bgeu' NÃO são pseudo: são instruções reais (ver
+# INSTR_TABLE) -- o processador decodifica os 4 nativamente (ver
+# ALUCtrl.vhdl/CPU.vhd). Só 'bgt'/'ble' continuam pseudo (RV32I não tem
+# essas duas de verdade): 'bgt rs1,rs2' == 'blt rs2,rs1' com os operandos
+# trocados, e idem para 'ble'/'bge' -- ver expand_pseudo().
 # 'jal' com 1 operando também é tratado como pseudo (ver expand_pseudo)
 
 
@@ -592,33 +647,11 @@ def expand_pseudo(mnemonic, operands, line_no):
         rs, label = operands
         return [("bne", [rs, "x0", label])]
 
-    # --- blt/bge/bltu/bgeu: essa CPU não decodifica esses branches como
-    # instrução real (só BEQ/BNE), mas dá pra montar o mesmo efeito com
-    # o que já existe: calcula a comparação com slt/sltu num registrador
-    # temporário e desvia com base nesse resultado (0 ou 1) via beq/bne.
-    #
-    # ATENÇÃO: essas pseudo-instruções usam x31 (t6) como registrador
-    # temporário/"scratch". Isso segue a mesma ideia do $at do MIPS: não
-    # use t6 logo antes de um blt/bge/bltu/bgeu/bgt/ble, porque o valor
-    # que estiver lá vai ser sobrescrito.
-    _CMP_TEMP_REG = "x31"  # t6
-
-    if m == "blt":  # blt rs1, rs2, label  ==  se (rs1 < rs2) desvia
-        rs1, rs2, label = operands
-        return [("slt", [_CMP_TEMP_REG, rs1, rs2]), ("bne", [_CMP_TEMP_REG, "x0", label])]
-
-    if m == "bge":  # bge rs1, rs2, label  ==  se (rs1 >= rs2) desvia  (NOT blt)
-        rs1, rs2, label = operands
-        return [("slt", [_CMP_TEMP_REG, rs1, rs2]), ("beq", [_CMP_TEMP_REG, "x0", label])]
-
-    if m == "bltu":  # idem a blt, comparação sem sinal
-        rs1, rs2, label = operands
-        return [("sltu", [_CMP_TEMP_REG, rs1, rs2]), ("bne", [_CMP_TEMP_REG, "x0", label])]
-
-    if m == "bgeu":  # idem a bge, comparação sem sinal
-        rs1, rs2, label = operands
-        return [("sltu", [_CMP_TEMP_REG, rs1, rs2]), ("beq", [_CMP_TEMP_REG, "x0", label])]
-
+    # --- bgt/ble: RV32I não tem essas duas de verdade (só blt/bge, que já
+    # são instruções REAIS agora -- ver INSTR_TABLE/ALUCtrl.vhdl/CPU.vhd).
+    # 'bgt rs1,rs2,label' == 'blt rs2,rs1,label' (troca os operandos); ao
+    # chamar expand_pseudo("blt", ...) recursivamente, o próprio "if m in
+    # INSTR_TABLE" no topo desta função já resolve para a instrução real.
     if m == "bgt":  # bgt rs1, rs2, label  ==  blt rs2, rs1, label  (troca operandos)
         rs1, rs2, label = operands
         return expand_pseudo("blt", [rs2, rs1, label], line_no)
@@ -987,12 +1020,12 @@ def assemble(source: str):
     def li_sequence(rd_tok, value, line_no):
         rd = parse_register(rd_tok, line_no)
         if _fits_signed(value, 12):
-            return [encode_i(value, 0, 0b000, rd, 0b0010011, line_no)]
+            return [encode_i(value, 0, FUNCT3_ADD_SUB, rd, OPCODE_I_ARITH, line_no)]
         upper = (value + 0x800) >> 12
         lower = value - (upper << 12)
-        words = [encode_u(upper, rd, 0b0110111, line_no)]
+        words = [encode_u(upper, rd, OPCODE_LUI, line_no)]
         if lower != 0:
-            words.append(encode_i(lower, rd, 0b000, rd, 0b0010011, line_no))
+            words.append(encode_i(lower, rd, FUNCT3_ADD_SUB, rd, OPCODE_I_ARITH, line_no))
         return words
 
     def far_jump_sequence(pc, target, link_rd, base_reg, line_no):
@@ -1006,8 +1039,8 @@ def assemble(source: str):
         upper = (offset + 0x800) >> 12
         lower = offset - (upper << 12)
         return [
-            encode_u(upper, base_reg, 0b0010111, line_no),          # auipc base_reg, upper
-            encode_i(lower, base_reg, 0b000, link_rd, 0b1100111, line_no),  # jalr link_rd, lower(base_reg)
+            encode_u(upper, base_reg, OPCODE_AUIPC, line_no),          # auipc base_reg, upper
+            encode_i(lower, base_reg, FUNCT3_JALR, link_rd, OPCODE_JALR, line_no),  # jalr link_rd, lower(base_reg)
         ]
 
     # ------------------------------------------------------------------
@@ -1242,26 +1275,38 @@ def disassemble_word(word, pc):
     rs2 = (word >> 20) & 0x1F
     funct7 = (word >> 25) & 0x7F
 
-    if opcode == 0b0110011:
-        names = {(0, 0): "add", (0, 0x20): "sub", (1, 0): "sll", (2, 0): "slt", (3, 0): "sltu",
-                 (4, 0): "xor", (5, 0): "srl", (5, 0x20): "sra", (6, 0): "or", (7, 0): "and"}
+    if opcode == OPCODE_R_TYPE:
+        names = {
+            (FUNCT3_ADD_SUB, FUNCT7_ZERO): "add", (FUNCT3_ADD_SUB, FUNCT7_ALT): "sub",
+            (FUNCT3_SLL, FUNCT7_ZERO): "sll",
+            (FUNCT3_SLT, FUNCT7_ZERO): "slt", (FUNCT3_SLTU, FUNCT7_ZERO): "sltu",
+            (FUNCT3_XOR, FUNCT7_ZERO): "xor",
+            (FUNCT3_SRL_SRA, FUNCT7_ZERO): "srl", (FUNCT3_SRL_SRA, FUNCT7_ALT): "sra",
+            (FUNCT3_OR, FUNCT7_ZERO): "or", (FUNCT3_AND, FUNCT7_ZERO): "and",
+        }
         name = names.get((funct3, funct7), f"??R({funct3},{funct7:#x})")
         return f"{name} {R[rd]}, {R[rs1]}, {R[rs2]}"
-    if opcode == 0b0010011:
-        if funct3 in (1, 5):
+    if opcode == OPCODE_I_ARITH:
+        if funct3 in (FUNCT3_SLL, FUNCT3_SRL_SRA):
             shamt = (word >> 20) & 0x1F
-            name = {(1, 0): "slli", (5, 0): "srli", (5, 0x20): "srai"}.get((funct3, funct7), "??shift")
+            name = {
+                (FUNCT3_SLL, FUNCT7_ZERO): "slli",
+                (FUNCT3_SRL_SRA, FUNCT7_ZERO): "srli", (FUNCT3_SRL_SRA, FUNCT7_ALT): "srai",
+            }.get((funct3, funct7), "??shift")
             return f"{name} {R[rd]}, {R[rs1]}, {shamt}"
         imm = _sext((word >> 20) & 0xFFF, 12)
-        name = {0: "addi", 2: "slti", 3: "sltiu", 4: "xori", 6: "ori", 7: "andi"}.get(funct3, "??i")
+        name = {
+            FUNCT3_ADD_SUB: "addi", FUNCT3_SLT: "slti", FUNCT3_SLTU: "sltiu",
+            FUNCT3_XOR: "xori", FUNCT3_OR: "ori", FUNCT3_AND: "andi",
+        }.get(funct3, "??i")
         return f"{name} {R[rd]}, {R[rs1]}, {imm}"
-    if opcode == 0b0000011:
+    if opcode == OPCODE_LOAD:
         imm = _sext((word >> 20) & 0xFFF, 12)
         return f"lw {R[rd]}, {imm}({R[rs1]})"
-    if opcode == 0b0100011:
+    if opcode == OPCODE_STORE:
         imm = _sext(((word >> 25) << 5) | ((word >> 7) & 0x1F), 12)
         return f"sw {R[rs2]}, {imm}({R[rs1]})"
-    if opcode == 0b1100011:
+    if opcode == OPCODE_BRANCH:
         b12 = (word >> 31) & 1
         b11 = (word >> 7) & 1
         b10_5 = (word >> 25) & 0x3F
@@ -1269,9 +1314,13 @@ def disassemble_word(word, pc):
         y = (b12 << 12) | (b11 << 11) | (b10_5 << 5) | (b4_1 << 1)
         y = _sext(y, 13)
         off = y * 2 if PC_REL_HALVED else y
-        name = {0: "beq", 1: "bne"}.get(funct3, "??b")
+        name = {
+            FUNCT3_BEQ: "beq", FUNCT3_BNE: "bne",
+            FUNCT3_BLT: "blt", FUNCT3_BGE: "bge",
+            FUNCT3_BLTU: "bltu", FUNCT3_BGEU: "bgeu",
+        }.get(funct3, "??b")
         return f"{name} {R[rs1]}, {R[rs2]}, {pc+off:#06x}  (offset={off})"
-    if opcode == 0b1101111:
+    if opcode == OPCODE_JAL:
         b20 = (word >> 31) & 1
         b19_12 = (word >> 12) & 0xFF
         b11 = (word >> 20) & 1
@@ -1280,16 +1329,16 @@ def disassemble_word(word, pc):
         y = _sext(y, 21)
         off = y * 2 if PC_REL_HALVED else y
         return f"jal {R[rd]}, {pc+off:#06x}  (offset={off})"
-    if opcode == 0b1100111:
+    if opcode == OPCODE_JALR:
         imm = _sext((word >> 20) & 0xFFF, 12)
         return f"jalr {R[rd]}, {imm}({R[rs1]})"
-    if opcode == 0b0110111:
+    if opcode == OPCODE_LUI:
         imm = (word >> 12) & 0xFFFFF
         return f"lui {R[rd]}, {imm:#x}"
-    if opcode == 0b0010111:
+    if opcode == OPCODE_AUIPC:
         imm = (word >> 12) & 0xFFFFF
         return f"auipc {R[rd]}, {imm:#x}"
-    if opcode == 0b1110011:
+    if opcode == OPCODE_SYSTEM:
         return "ecall"
     return f"??? opcode={opcode:#04x} word={word:08x}"
 

@@ -59,7 +59,13 @@ begin
         when I_ARITH_OP =>
             RegWrite <= '1';
             ALUSrc   <= '1';
-            ALUOp    <= "10";
+            -- ALUOp "11" (nao "10", como no R-type): ver ALUCtrl.vhdl. Para
+            -- ADDI (funct3="000"), os bits imOUT(31 downto 25) sao parte do
+            -- imediato de 12 bits (imm[11:5]), NAO um funct7 de verdade --
+            -- usar o mesmo ALUOp do R-type faria a ALUControl confundir
+            -- ADDI com SUB sempre que esse imediato tivesse imm[11:5] =
+            -- "0100000" (imediatos entre 1024 e 1055).
+            ALUOp    <= "11";
         when LOAD_OP =>
             MemRead  <= '1';
             MemToReg <= '1';
