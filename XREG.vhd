@@ -62,15 +62,14 @@ begin
   -- todos conectados ao mesmo data/clk
   -- barramento RAMNT para clr e ld
   -- array RAMNT para saida
-  -- x0 nao gera, caso desejavel troque (1 to RAMNT-1) por (0 to RAMNT-1)
   GENREGS:
   for I in 1 to RAMNT-1 generate
     REGX: REG port map (data, clk, reset, xld(I), out_q(I));
   end generate GENREGS;
 
   -- processa valor de rs1 pendente. IMPORTANTE: sensível também a "out_q"
-  -- (não só a "rs1") -- senão, sempre que a instrução ATUAL ler o MESMO
-  -- registrador que a instrução ANTERIOR acabou de escrever (ex.: "addi
+  -- (não só a "rs1") -- senão, sempre que a instrução ATUAL ler o mesmo
+  -- registrador que a instrução anterior acabou de escrever (ex.: "addi
   -- sp,sp,-20" seguido de "sw ra,16(sp)", ambos com rs1=sp), "rs1" não
   -- muda de valor entre as duas instruções e este processo não é
   -- reativado -- "dr1" continua mostrando o conteúdo ANTIGO de out_q(rs1),
@@ -111,7 +110,7 @@ begin
     end if;
   end process settleWr;
 
-  -- x0 (índice 0) nunca é gerado como REG (ver GENREGS acima); mantém a
+  -- x0 (índice 0) nunca é gerado como REG; mantém a
   -- posição zerada por conta própria
   out_q(0) <= (others => '0');
 

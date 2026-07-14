@@ -40,13 +40,13 @@ entity tb_uRV is
     RAMSIZE       : integer := 13;                       -- deve bater com o generic RAMSIZE da uRV
     ROMSIZE       : integer := 11;                       -- deve bater com o generic ROMSIZE da uRV
     TRACE_CYCLES  : integer := 0;                        -- > 0: liga o trace de depuração da CPU (ver CPU.vhd)
-    -- Programas SEM pilha de chamadas (ex.: teste1, bubble sort) não
+    -- Programas sem pilha de chamadas (ex.: teste1, bubble sort) não
     -- tocam em nenhum endereço além do que EXPECTED_FILE cobre, então
     -- todo o restante da RAM realmente deve estar zerado -- daí o
-    -- default 'true'. Programas COM pilha (ex.: teste2, quicksort
+    -- default 'true'. Programas com pilha (ex.: teste2, quicksort
     -- recursivo) usam e legitimamente deixam resíduo não-zerado em
     -- endereços de pilha ao final da execução (dar "pop" num quadro só
-    -- move o sp de volta, não apaga o que estava lá); nesse caso, passe
+    -- move o sp de volta, não apaga o que estava lá); nesse caso, eh necessário passar
     -- CHECK_TAIL_ZERO=false para não gerar falsos positivos.
     CHECK_TAIL_ZERO : boolean := true;
     CLK_PERIOD    : time    := 10 ns
@@ -169,7 +169,7 @@ begin
 
         -- o restante da RAM (alem do que o arquivo esperado cobre) precisa
         -- estar zerado -- só faz sentido para programas que não usam
-        -- pilha de chamadas (ver CHECK_TAIL_ZERO acima)
+        -- pilha de chamadas
         if CHECK_TAIL_ZERO then
           while addr <= RAMDP_C - 4 loop
             read_ram_word(addr, got_word);

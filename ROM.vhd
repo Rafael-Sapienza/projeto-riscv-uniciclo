@@ -24,7 +24,7 @@ type out_vec is array(0 to ROMDP-1) of std_logic_vector(WSIZE-1 downto 0);
 
 -- Função para ler o arquivo de instruções (INIT_FILE) e retornar um vetor
 -- memória. Lê uma palavra (linha) por endereço, começando em 0, até
--- encontrar o fim do arquivo OU até preencher todos os ROMDP endereços —
+-- encontrar o fim do arquivo ou até preencher todos os ROMDP endereços —
 -- o que ocorrer primeiro. Os endereços não preenchidos permanecem
 -- zerados (valor inicial de rom_data), então o arquivo de entrada não
 -- precisa mais ser preenchido com zeros até a profundidade da ROM.

@@ -11,8 +11,7 @@ entity REG is
     clk, clr, ld : in std_logic;
     -- valor padrão explícito: garante que "q" comece definido (zero) a
     -- partir do primeiríssimo ciclo delta da simulação, sem depender da
-    -- ordem em que os processos são avaliados pela primeira vez (ver
-    -- log/08-registrador-sem-valor-padrao-na-porta.md)
+    -- ordem em que os processos são avaliados pela primeira vez
     q            : out std_logic_vector(WSIZE-1 downto 0) := (others => '0')
   );
 end REG;

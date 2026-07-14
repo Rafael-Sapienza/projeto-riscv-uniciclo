@@ -64,7 +64,7 @@ begin
       -- Sem o corte para B(4 downto 0), to_integer(unsigned(B)) recebe o
       -- valor de 32 bits inteiro: se o bit mais alto de B estiver ligado
       -- (valor sem sinal >= 2^31), a conversao estoura o intervalo de
-      -- NATURAL e o ModelSim acusa "TO_INTEGER: Value ... is not in
+      -- natural e o ModelSim acusa "TO_INTEGER: Value ... is not in
       -- bounds of subtype NATURAL". Para SLLI/SRLI/SRAI (B = imediato)
       -- isso e inofensivo, pois o genImm32 ja entrega o shamt isolado e
       -- zero-estendido (ver ImmGen.vhd, tipo ITS) -- o corte so muda o

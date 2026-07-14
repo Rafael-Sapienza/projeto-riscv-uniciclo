@@ -13,15 +13,15 @@ entity uRV is
     RADRR : natural := 5;
     ROM_FILE : string := "data.txt"; -- arquivo de instruções (hex, 1 palavra/linha)
     RAM_FILE : string := "";         -- arquivo de dados iniciais da RAM (vazio = RAM zerada)
-    TRACE_CYCLES : integer := 0      -- > 0: imprime pc/instr/registradores nos N primeiros ciclos (debug)
+    TRACE_CYCLES : integer := 0      -- > 0: imprime pc/instr/registradores nos n primeiros ciclos (debug)
   );
   port (
     clk       : in  std_logic;
     -- reset assíncrono do PC (ativo em '1'). Sem isso, o registrador do PC
     -- nunca recebe um valor definido: seu próprio "d" (pcIN) depende de
     -- pcp4OUT, que depende de pcOUT -- um laço que, partindo de 'U'
-    -- (indefinido), nunca converge sozinho para um valor real. O
-    -- testbench deve pulsar reset='1' por pelo menos 1 ciclo no início da
+    -- (indefinido), nunca converge sozinho para um valor real. Por isso, o
+    -- testbench pulsa reset='1' por pelo menos 1 ciclo no início da
     -- simulação antes de liberar o clock.
     reset     : in  std_logic := '1';
     halt      : out std_logic := '0'; -- '1' quando o programa chamou ecall Exit2 (a7=93)
@@ -160,10 +160,10 @@ end component ALUControl;
 signal pcIN, pcOUT     : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- PC in/out
 signal pcDISPL         : std_logic_vector(WSIZE-1 downto 0) := (others => '0'); -- PC displacement (pc+imm)
 signal pcTARGET        : std_logic_vector(WSIZE-1 downto 0) := (others => '0');
--- PC+4 (combinacional, direto de pcOUT -- ver addPC4). NÃO é registrado:
+-- PC+4 (combinacional, direto de pcOUT -- ver addPC4). Não é registrado:
 -- é usado tanto para o "próximo PC" (fall-through) quanto para o endereço
 -- de retorno de JAL/JALR, e em ambos os casos precisa refletir o PC
--- ATUAL (pcOUT) no MESMO ciclo. Um registrador separado aqui (como havia
+-- atual (pcOUT) no mesmo ciclo. Um registrador separado aqui (como havia
 -- antes) criava um laço combinacional pcIN -> pcp4IN -> pcIN sem nenhum
 -- elemento de memória quebrando o ciclo, travando a simulação em "iteration
 -- limit reached" logo em 0 ps, antes do primeiro clock.
@@ -243,7 +243,7 @@ begin
 
   -- Registrador PC (PC+4 agora é combinacional, ver addPC4/pcp4OUT).
   -- clr = reset (não mais cnstZERO): é o único jeito de o PC começar
-  -- definido em vez de indeterminado (ver comentário no port de reset).
+  -- definido em vez de indeterminado
   regPC: REG port map(pcIN, clk, reset, cnstONE, pcOUT);
 
   -- Memória ROM de instruções
@@ -332,7 +332,7 @@ begin
   end process lgmuxPC;
 
   -- Detecta o ecall de saída (Exit2, a7=93). O restante do datapath
-  -- continua decodificando a MESMA instrução ecall enquanto o PC estiver
+  -- continua decodificando a mesma instrução ecall enquanto o PC estiver
   -- congelado (ver muxPC), o que é seguro: ecall nunca escreve em
   -- registrador nem em memória (RegWrite/MemWrite ficam em '0' por
   -- default no ControlUnit para o opcode SYSTEM).
@@ -413,7 +413,7 @@ begin
     end if;
   end process ecallPrint;
 
-  -- Trace de depuração TEMPORÁRIO (TRACE_CYCLES=0 desativa, é o padrão):
+  -- Trace de depuração temporário (TRACE_CYCLES=0 desativa, é o padrão):
   -- imprime pc/instrução/alguns registradores a cada ciclo, para comparar
   -- contra um emulador de referência e localizar divergências de execução.
   tracePr: process

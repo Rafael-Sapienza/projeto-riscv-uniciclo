@@ -26,7 +26,7 @@ entity RAM is
     dbg_addr : in std_logic_vector(ASIZE-1 downto 0) := (others => '0');
     dbg_byte : out std_logic_vector(BSIZE-1 downto 0);
     -- porta de depuração (palavra): leitura combinacional de 1 palavra de
-    -- 32 bits, independente da porta acima. Usada pelo TESTBENCH para ler
+    -- 32 bits, independente da porta acima. Usada pelo testbench para ler
     -- o conteúdo final da RAM sem precisar de "external names" (que se
     -- mostraram frágeis quanto à ordem de elaboração em algumas versões
     -- do ModelSim/Questa).
@@ -63,8 +63,7 @@ type out_vec is array(0 to RAMDP-1) of std_logic_vector(BSIZE-1 downto 0);
 -- Lê INIT_FILE (1 palavra de 32 bits por linha, big-endian) e carrega os
 -- bytes sequencialmente a partir do endereço 0. Lê até o fim do arquivo OU
 -- até preencher toda a RAM, o que ocorrer primeiro. Se INIT_FILE for uma
--- string vazia, nada é lido e a RAM permanece zerada (comportamento
--- padrão, compatível com o uso anterior sem arquivo de entrada).
+-- string vazia, nada é lido e a RAM permanece zerada
 impure function init_mem return out_vec is
   variable ram_data  : out_vec := (others => (others => '0'));
   variable idx       : integer := 0;
@@ -126,7 +125,7 @@ begin
   end process trc_pr;
 
   -- leitura combinacional (assíncrona): numa CPU uniciclo, o dado do "lw"
-  -- precisa estar disponível no MESMO ciclo em que o endereço é calculado,
+  -- precisa estar disponível no mesmo ciclo em que o endereço é calculado,
   -- não no ciclo seguinte. Antes, esta leitura estava dentro de
   -- `if rising_edge(clk)`, ou seja, "dataout" só refletia o endereço do
   -- ciclo ANTERIOR -- bug real, confirmado simulando a CPU (lw lia o

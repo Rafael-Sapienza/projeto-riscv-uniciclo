@@ -120,7 +120,7 @@ begin
                     ALUControl <= "0000";      -- ADD
                 ----------------------------------------------------------
                 -- SLLI (o shamt de SLLI/SRLI/SRAI ja vem isolado e
-                -- zero-estendido pelo genImm32 -- ver ImmGen.vhd, tipo ITS)
+                -- zero-estendido pelo genImm32)
                 ----------------------------------------------------------
                 when "001" =>
                     ALUControl <= "0101";
